@@ -1,0 +1,34 @@
+# Dart / Flutter
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+
+# Generated platform folders (CI runs `flutter create` to regenerate them).
+# Commenting out the ignore for android/macos if you want to commit them —
+# but the workflow regenerates them on every release.
+desktop/macos/
+desktop/windows/
+desktop/linux/
+desktop/ios/
+desktop/web/
+desktop/android/
+mobile/macos/
+mobile/windows/
+mobile/linux/
+mobile/ios/
+mobile/web/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# macOS
+.DS_Store
+
+# Logs / db
+*.log
+*.db

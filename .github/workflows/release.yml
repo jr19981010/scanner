@@ -1,0 +1,121 @@
+name: release
+
+# Triggers when you push a tag like `v1.0.0`.
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-macos-dmg:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.1'
+          channel: stable
+          cache: true
+
+      - name: Enable macOS desktop
+        run: flutter config --enable-macos-desktop
+
+      - name: Generate native platform folders (desktop)
+        working-directory: desktop
+        run: flutter create . --project-name omr_desktop --platforms=macos
+
+      - name: Install Dart deps
+        working-directory: desktop
+        run: flutter pub get
+
+      - name: Build macOS release
+        working-directory: desktop
+        run: flutter build macos --release
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Package .dmg
+        working-directory: desktop
+        run: |
+          mkdir -p ../artifacts
+          create-dmg \
+            --volname "OMR Desktop" \
+            --window-size 600 400 \
+            --icon-size 96 \
+            --app-drop-link 450 200 \
+            "../artifacts/OMR-Desktop-${{ github.ref_name }}.dmg" \
+            "build/macos/Build/Products/Release/omr_desktop.app"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dmg
+          path: artifacts/*.dmg
+
+  build-android-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.1'
+          channel: stable
+          cache: true
+
+      - name: Generate native platform folders (mobile)
+        working-directory: mobile
+        run: flutter create . --project-name omr_mobile --platforms=android
+
+      - name: Patch AndroidManifest with required permissions
+        run: |
+          MANIFEST=mobile/android/app/src/main/AndroidManifest.xml
+          # Insert permissions just above <application> if not already present.
+          if ! grep -q "android.permission.CAMERA" $MANIFEST; then
+            sed -i 's|<application|    <uses-permission android:name="android.permission.CAMERA"/>\n    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>\n    <application|' $MANIFEST
+          fi
+          cat $MANIFEST
+
+      - name: Install Dart deps
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Build APK
+        working-directory: mobile
+        run: flutter build apk --release
+
+      - name: Rename APK
+        run: |
+          mkdir -p artifacts
+          cp mobile/build/app/outputs/flutter-apk/app-release.apk \
+            "artifacts/OMR-Scanner-${{ github.ref_name }}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: artifacts/*.apk
+
+  publish-release:
+    needs: [build-macos-dmg, build-android-apk]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false

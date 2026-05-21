@@ -1,0 +1,10 @@
+name: omr_shared
+description: Shared models and wire protocol for the offline OMR system.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  meta: ^1.12.0

@@ -29,6 +29,26 @@ jobs:
         working-directory: desktop
         run: flutter pub get
 
+      - name: Patch macOS sandbox entitlements
+        # The embedded HTTP/WebSocket server binds to 0.0.0.0:4040 and needs
+        # outbound HTTP for the GitHub update check, so both network entitlements
+        # must be true. Default flutter create only enables client.
+        run: |
+          for f in desktop/macos/Runner/DebugProfile.entitlements desktop/macos/Runner/Release.entitlements; do
+            /usr/libexec/PlistBuddy -c "Set :com.apple.security.network.server true" $f 2>/dev/null \
+              || /usr/libexec/PlistBuddy -c "Add :com.apple.security.network.server bool true" $f
+            /usr/libexec/PlistBuddy -c "Set :com.apple.security.network.client true" $f 2>/dev/null \
+              || /usr/libexec/PlistBuddy -c "Add :com.apple.security.network.client bool true" $f
+            # Allow access to app-support dir (where SQLite db lives) — sandbox grants this by default,
+            # but we also add user-selected files so PDF export to Downloads works.
+            /usr/libexec/PlistBuddy -c "Set :com.apple.security.files.user-selected.read-write true" $f 2>/dev/null \
+              || /usr/libexec/PlistBuddy -c "Add :com.apple.security.files.user-selected.read-write bool true" $f
+            /usr/libexec/PlistBuddy -c "Set :com.apple.security.files.downloads.read-write true" $f 2>/dev/null \
+              || /usr/libexec/PlistBuddy -c "Add :com.apple.security.files.downloads.read-write bool true" $f
+            echo "--- $f ---"
+            /usr/libexec/PlistBuddy -c "Print" $f
+          done
+
       - name: Build macOS release
         working-directory: desktop
         run: flutter build macos --release
